@@ -77,18 +77,18 @@ void Layer::bp_clear()
 }
 
 
-__device__ float step_function(float v)
+__device__ float sigmoid(float v)
 {
 	return 1 / (1 + exp(-v));
 }
 
-__global__ void apply_step_function(float *input, float *output, const int N)
+__global__ void apply_sigmoid(float *input, float *output, const int N)
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
 	for (int idx = N * pos / size; idx < N * (pos+1) / size; ++idx) {
-		output[idx] = step_function(input[idx]);
+		output[idx] = sigmoid(input[idx]);
 	}
 }
 
@@ -151,8 +151,6 @@ __global__ void fp_bias_c1(float preact[6][24][24], float bias[6])
 }
 
 
-/************/
-
 __global__ void fp_preact_c2(float input[6][24][24], float preact[6][12][12], float weight[6][2][2])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
@@ -177,7 +175,7 @@ __global__ void fp_bias_c2(float preact[6][12][12], float bias[6])
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = 6*6*6;
+	const int N = 6*12*12;
 
 	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
 		int idx = n;
@@ -317,7 +315,7 @@ __global__ void bp_preact_c3(float d_preact[6][6][6], float d_output[6][6][6], f
 		const int i2 = ((idx /= 6	) % 6);
 		const int i3 = ((idx /= 6	) % 6);
 
-		const float o = step_function(preact[i1][i2][i3]);
+		const float o = sigmoid(preact[i1][i2][i3]);
 
 		d_preact[i1][i2][i3] = d_output[i1][i2][i3] * o * (1 - o);
 	}
@@ -328,7 +326,7 @@ __global__ void bp_weight_c3(float d_weight[6][2][2], float d_preact[6][6][6], f
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
 
-	const int N = 1*4*4*6*6*6;
+	const int N = 6*2*2*6*6*6;
 	const float d = pow(6.0f, 3.0f);
 
 	for (int n = N * pos / size; n < N * (pos+1) / size; ++n) {
@@ -397,7 +395,7 @@ __global__ void bp_preact_c2(float d_preact[6][12][12], float d_output[6][12][12
 		const int i2 = ((idx /= 6	) % 12);
 		const int i3 = ((idx /= 12	) % 12);
 
-		const float o = step_function(preact[i1][i2][i3]);
+		const float o = sigmoid(preact[i1][i2][i3]);
 
 		d_preact[i1][i2][i3] = d_output[i1][i2][i3] * o * (1 - o);
 	}
@@ -477,7 +475,7 @@ __global__ void bp_preact_c1(float d_preact[6][24][24], float d_output[6][24][24
 		const int i2 = ((idx /= 6	) % 24);
 		const int i3 = ((idx /= 24	) % 24);
 
-		const float o = step_function(preact[i1][i2][i3]);
+		const float o = sigmoid(preact[i1][i2][i3]);
 
 		d_preact[i1][i2][i3] = d_output[i1][i2][i3] * o * (1 - o);
 	}
